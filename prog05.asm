@@ -1,11 +1,11 @@
 TITLE Project 05    (proj05.asm)
 
 ; Author: Danny Tran
-; Last Modified: 2/14/2020
+; Last Modified: 2/24/2020
 ; OSU email address: trandan@oregonstate.edu
 ; Course number/section: COMPUTER ARCH & ASSEM LANGUAGE (CS_271_C400_W2020)
-; Project Number: 5                Due Date: 2/16/2020
-; Description:   A program to calculate the nth composite number(s).
+; Project Number: 5                Due Date: 3/1/2020
+; Description:  
 
 INCLUDE Irvine32.inc
 
@@ -29,6 +29,7 @@ unsortListTitle     byte    0dh, 0ah,"Your unsorted random numbers:", 0dh, 0ah, 
 sortedListTitle     byte    0dh, 0ah,"Your sorted random numbers:", 0dh, 0ah, 0
 countListTitle      byte    0dh, 0ah,"Your list of instances of each generated number, starting with the number of 10s:", 0dh, 0ah, 0
 medianTitle         BYTE    0dh, 0ah,"List Median: ",0
+filename BYTE "randonumbers.txt",0
 
 .code
 main PROC   
