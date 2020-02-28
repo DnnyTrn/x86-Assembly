@@ -14,14 +14,12 @@ LO = 10
 HI = 29
 ARRAYSIZE = 200
 COUNTSIZE = 20
-BUFFERSIZE = 5000
+BUFFERSIZE = 200
 
 .data
-fileHandle          HANDLE  ?
-
 ; (insert variable definitions here) 
 array               dword   ARRAYSIZE DUP(?)
-counts              dword   HI DUP(0)
+counts              dword   30 DUP(0)
 author              byte    "Author: Danny Tran " , 0dh, 0ah, 0 
 programTitle        byte    "Title: Sorting and Counting Random integers! ", 0dh, 0ah, 0
 instructions0       byte    "This program generates 200 random numbers in the range [10 ... 29], displays the original list, sorts the list, displays the median value, displays the list sorted in ascending order, then displays the number of instances of each generated value.", 0
@@ -33,7 +31,7 @@ countListTitle      byte    0dh, 0ah,"Your list of instances of each generated n
 medianTitle         BYTE    0dh, 0ah,"List Median: ",0
 filename            BYTE    "randonumbers.bin",0
 buffer              dword   BUFFERSIZE DUP(0)
-
+fileHandle          HANDLE  ?
 
 .code
 main PROC   
@@ -62,11 +60,12 @@ main PROC
     push OFFSET unsortListTitle
     call displayList   
   
-    push COUNTSIZE
-    push OFFSET array   
-    push ARRAYSIZE 
-    push OFFSET counts
-    push LO
+    push OFFSET array  ;20 
+    push ARRAYSIZE  ;16
+    push OFFSET counts ;12
+    push COUNTSIZE ;8
+
+    ;push LO ;8
     call countList
 
     push OFFSET counts
@@ -312,61 +311,34 @@ displayMedian   ENDP
 countList       PROC
    	push ebp
     mov ebp, esp
+    mov esi, [ebp + 20] ; array offset
+    mov edi, [ebp + 12] ; counts offset
 
-	mov edx, [ebp + 20]  ;array OFFSET
-    mov edi, edx        ;copy of array offset that is used for innerloop
-    mov esi, [ebp + 12] ;counts offset
-
-	;mov edi, [ebp + 12] ;countArray OFFSET
-    xor ecx, ecx    ;outer loop counter
-    outerLoop:
-		push ecx        ;save outerloop count
-        xor eax, eax    ;set occurences to 0 
-        xor ecx, ecx    ;inner loop counter
-    findN:		
-        push edi
-        push edx
-        mov edi, [edi]
-        mov edx, [edx]
-        cmp edx, edi
-		jne notFound    ;if found increment countArray
-        inc eax
-	notFound:
-        pop edx
-        pop edi
-        add edi, 4  
-        inc ecx          ;check inner loop count with size to exit/repeat
-        cmp ecx, [ebp + 16]
-		jl findN	    
-                       ;after inner loop finishes save count (eax) to counts[i]
-        push eax
-        push edx
-        mov eax, [edx]   ;move countArray offset to eax
-        mov edx, 4      ;set multiplicand to 4
-        mul edx 
-        add esi, eax    ;countArray offset += [edx] * 4
-        
-        pop edx     ;restore array offset
-        pop eax     ;restore count        
-        mov [esi], eax ;mov count to counts[esi]
-
-        mov esi, [ebp +12]
-        mov edi, [ebp + 20] ; reset edi to beginning 
-        add edx, 4
-        pop ecx         ;check outer loop count with size to exit/repeat
-        inc ecx
-        cmp ecx, [ebp + 16]
-		jl outerLoop	
+    ;set up for loop from 0 (ecx) to array size
+    xor ecx, ecx
+    L1:
+        mov eax, [esi] ; convert eax to dword address using esi. looks something like: c[a[i]]++
+        mov ebx, TYPE dword
+        mul ebx     
+        add edi, eax   ; add dword address to move inside counts
+        mov eax, 1     ; increment number at that address 
+        add [edi], eax
+        mov edi, [ebp + 12] ; reset edi to beginning of counts
+        add esi, TYPE dword          ; move array foward
+        inc ecx             ; increment loop counter
+        cmp ecx, [ebp + 16]    
+    jl L1
     
-    cld                 ;shift 10-29 elements to 0 index of counts using movsd
-    mov esi, [ebp + 12] ;set esi to counts+40 (counts[9], 10th element)
-    add esi, 40
-    mov ecx, [ebp + 24]  ;set counter to size of counts (20)
-    mov edi, [ebp + 12] ; set edi to counts[0] offset
+    ; shift index 10-29 to the left of counts by using rep movsd
+    cld                
+    mov esi, [ebp + 12] ;set esi to the 10th element (counts+40)
+    add esi, 40         
+    mov ecx, [ebp + 8]  ;set rep counter to size of counts (20)
+    mov edi, [ebp + 12] ; set esi to counts[0] offset
     rep movsd           ;moves contents of esi to edi using ecx as counter
 	
     pop ebp
-    ret 24
+    ret 20
 countList       ENDP
 
 ;intro procedure -------------------------------------
