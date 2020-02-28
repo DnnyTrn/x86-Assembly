@@ -14,8 +14,11 @@ LO = 10
 HI = 29
 ARRAYSIZE = 200
 COUNTSIZE = 20
+BUFFERSIZE = 5000
 
 .data
+fileHandle          HANDLE  ?
+
 ; (insert variable definitions here) 
 array               dword   ARRAYSIZE DUP(?)
 counts              dword   HI DUP(0)
@@ -24,12 +27,13 @@ programTitle        byte    "Title: Sorting and Counting Random integers! ", 0dh
 instructions0       byte    "This program generates 200 random numbers in the range [10 ... 29], displays the original list, sorts the list, displays the median value, displays the list sorted in ascending order, then displays the number of instances of each generated value.", 0
 terminatingMsg      byte    "End of program goodbye ", 0
 error0              byte    "Out of range. Enter a number in [1 .. 400] ", 0dh, 0ah, 0
-space2              byte    "  ",0
 unsortListTitle     byte    0dh, 0ah,"Your unsorted random numbers:", 0dh, 0ah, 0
 sortedListTitle     byte    0dh, 0ah,"Your sorted random numbers:", 0dh, 0ah, 0
 countListTitle      byte    0dh, 0ah,"Your list of instances of each generated number, starting with the number of 10s:", 0dh, 0ah, 0
 medianTitle         BYTE    0dh, 0ah,"List Median: ",0
-filename BYTE "randonumbers.txt",0
+filename            BYTE    "randonumbers.bin",0
+buffer              dword   BUFFERSIZE DUP(0)
+
 
 .code
 main PROC   
@@ -37,12 +41,22 @@ main PROC
     call displayInstructions ;  inform user program instructions
 
     call randomize
+
+    push offset buffer
+    push offset filename   
+    push offset fileHandle      ;+24
     push  ARRAYSIZE ;+20
     push  LO ;+16
     push   HI ;+12
     push OFFSET array ;+8
-    call fillArray
-    
+    call fillArrayToFile
+
+    ;push  ARRAYSIZE ;+20
+    ;push  LO ;+16
+    ;push   HI ;+12
+    ;push OFFSET array ;+8
+   ; call fillArray
+
     push OFFSET array 
     push ARRAYSIZE 
     push OFFSET unsortListTitle
@@ -89,11 +103,81 @@ main ENDP
 ; ***************************************************************
 ; Generate ARRAYSIZE random integers in the range [LO = 10 .. HI = 29], 
 ;   storing them in consecutive elements of an array. ARRAYSIZE should be set to 200.
+
+    ;Generate the numbers into a file;  
+    ;then read the file into the array. (3pts)
+; receives:  fileName, file handle,  array to fill, array size,
+; returns: first count elements of array contain consecutive squares
+; preconditions: count is initialized, 1 <= count <= 100; registers changed: eax, ebx, ecx, edi
+; ***************************************************************
+fillArrayToFile PROC
+    push ebp
+    mov ebp, esp
+    mov edi, [ebp + 24] ;file handle offset
+
+    ;create outputfile using filename
+    mov edx,  [ebp + 28] ;filename offset
+    call CreateOutputFile
+
+    mov [edi], eax ; store file handle 
+    cmp eax, INVALID_HANDLE_VALUE ;if return value is equal to INVALID_HANDLE_VALUE then print error message
+    je errorMsg      
+
+    ;fill buffer with random numbers using fillArray function
+    pushad
+    push  [ebp + 20] ; arraysize to generate arraysize numbers
+    push  [ebp + 16] ; LO value 16
+    push  [ebp + 12]  ; HI value 29
+    push  [ebp + 32]  ; buffer offset
+    call fillArray
+    popad
+
+    ;write buffer to file using WriteToFile function
+    mov eax, [ebp + 20] ;set up number of bytes by multiplying type dword and arraysize
+    mov ebx, type dword
+    mul ebx 
+    mov ecx, eax    ; 800 bytes to write to file (param1)
+    mov ebx, ecx    ; save value for readfromfile function
+    mov eax, [edi]  ; file handle (param2)
+    mov edx, [ebp + 32] ; buffer offset   (param3)      
+    call WriteToFile ;write 800 bytes from buffer to file using the file handle
+       
+    mov eax, [edi]  ; close file using file handle offset in edi
+    call CloseFile
+
+    ;After writing to randonumbers.bin, call OpenInputFile to begin reading from it
+    mov edx, [ebp + 28]     ;filename param for openinputfile
+    call OpenInputFile      ;requires name of file offset in edx
+
+    mov [edi], eax                ;return value is file handle stored in EAX, save this in ESI
+    cmp eax, INVALID_HANDLE_VALUE ;if return value is equal to INVALID_HANDLE_VALUE then print error message
+    je errorMsg  
+
+    ;set up ReadFromFile function to read binaries into array
+    mov edx, [ebp + 8]  ; array offset as param. (param1)
+    mov ecx, ebx        ; 800 bytes to write (param2)
+    call ReadFromFile   ;read from randonumbers.bin to array 
+    jc errorMsg   ;If CF is clear, EAX = number of bytes read 
+                  ;But if CF is set, EAX contains a numeric system error code.
+    mov eax, [edi]
+    call CloseFile
+
+    jmp noerror ;if everything went well return
+        
+    errorMsg:   
+        call WriteWindowsMsg ;display error message
+    noerror:
+        pop ebp
+        ret 28
+fillArrayToFile ENDP
+; ***************************************************************
+; Generate ARRAYSIZE random integers in the range [LO = 10 .. HI = 29], 
+;   storing them in consecutive elements of an array. ARRAYSIZE should be set to 200.
 ; receives: fillArray {parameters: array(reference), LO (value), HI (value), ARRAYSIZE(value)} 
 ; returns: first count elements of array contain consecutive squares
 ; preconditions: count is initialized, 1 <= count <= 100; registers changed: eax, ebx, ecx, edi
 ; ***************************************************************
-fillArray   PROC
+fillArray   PROC   
     push ebp
     mov ebp, esp
     mov ecx, [ebp + 20]  ;array Size
@@ -126,16 +210,16 @@ displayList     PROC
     mov ebp, esp
     sub esp, 4
     mov DWORD PTR [ebp-4], 0 ; count for printing a line 
-    mov edi, [ebp + 16];  array offset
-    mov ecx, [ebp + 12]; array size
-    mov edx, [ebp + 8]; title offset
-    call writestring
-       
+    mov edi, [ebp + 16] ;  array offset
+    mov ecx, [ebp + 12] ; array size
+    mov edx, [ebp + 8] ; title offset
+    call writestring    ;Print title of list to screen
+        
     displayLoop:
-        mov eax, [edi] ;print array[edi]
+        mov eax, [edi] ;print array at current edi offset
         call writedec 
         add edi, TYPE DWORD ;move to next element in array
-        inc DWORD PTR [ebp-4] ;increment count
+        inc DWORD PTR [ebp-4] ;increment count for printing a line
         mov al, ' ' ;print 2 spaces onto screen
         call writechar      
         call writechar
@@ -146,7 +230,7 @@ displayList     PROC
         ;call CRLF
         mov DWORD PTR [ebp-4],0 ;reset count and print line
         skipPrintLine:
-    loop displayLoop
+    loop displayLoop    
 
     mov esp, ebp
     pop ebp
