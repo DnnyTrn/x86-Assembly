@@ -1,7 +1,7 @@
 TITLE Project 05    (proj05.asm)
 
 ; Author: Danny Tran
-; Last Modified: 2/24/2020
+; Last Modified: 2/27/2020
 ; OSU email address: trandan@oregonstate.edu
 ; Course number/section: COMPUTER ARCH & ASSEM LANGUAGE (CS_271_C400_W2020)
 ; Project Number: 5                Due Date: 3/1/2020
@@ -38,7 +38,7 @@ main PROC
     call intro  ;Display your name and program title on the output screen.    
     call displayInstructions ;  inform user program instructions
 
-    call randomize
+    call randomize  ;call randomize before calling fillArray or fillArrayToFile
 
     push offset buffer
     push offset filename   
@@ -48,13 +48,7 @@ main PROC
     push   HI ;+12
     push OFFSET array ;+8
     call fillArrayToFile
-
-    ;push  ARRAYSIZE ;+20
-    ;push  LO ;+16
-    ;push   HI ;+12
-    ;push OFFSET array ;+8
-   ; call fillArray
-
+    
     push OFFSET array 
     push ARRAYSIZE 
     push OFFSET unsortListTitle
@@ -64,8 +58,6 @@ main PROC
     push ARRAYSIZE  ;16
     push OFFSET counts ;12
     push COUNTSIZE ;8
-
-    ;push LO ;8
     call countList
 
     push OFFSET counts
@@ -76,9 +68,7 @@ main PROC
     push HI
     push LO
     push OFFSET array
-    push ARRAYSIZE
-    push OFFSET counts
-    push COUNTSIZE
+    push OFFSET counts 
     call sortList
 
     mov edx, OFFSET medianTitle
@@ -92,7 +82,7 @@ main PROC
     push ARRAYSIZE 
     push OFFSET sortedListTitle
     call displayList
-FAREWELL:
+
     call displayFarewell ; Display a terminating message. 
 
     exit    ; exit to operating system
@@ -219,7 +209,7 @@ displayList     PROC
         call writedec 
         add edi, TYPE DWORD ;move to next element in array
         inc DWORD PTR [ebp-4] ;increment count for printing a line
-        mov al, ' ' ;print 2 spaces onto screen
+        mov al, '  ' ;print 2 spaces onto screen
         call writechar      
         call writechar
         
@@ -228,8 +218,9 @@ displayList     PROC
         jne  skipPrintLine        
         ;call CRLF
         mov DWORD PTR [ebp-4],0 ;reset count and print line
-        skipPrintLine:
-    loop displayLoop    
+    
+    skipPrintLine:
+        loop displayLoop    
 
     mov esp, ebp
     pop ebp
@@ -246,20 +237,18 @@ displayList     ENDP
 sortList    PROC
     push ebp
     mov ebp, esp
-    mov edi, [ebp + 20]  ;&array
-    mov ebx, [ebp + 16]  ;ARRAYSIZE
-    mov esi, [ebp + 12]  ;&counts
-    mov edx, [ebp + 8]   ;COUNTSIZE
+    mov edx, [ebp + 20] ; HI
+    mov edi, [ebp + 12] ; &array
+    mov esi, [ebp + 8]  ; &counts
 
     cld
-    mov eax, [ebp + 24]  ;  set eax to LO(10), loop until HI(29)
-    CountsLoop:          ;build array by using counts array
-       mov ecx, [esi]        ;set ecx to value at counts for stosd         
-       rep stosd            ;store eax into &array (edi)
-        
-        add esi, 4      ;move esi to next element of counts
+    mov eax, [ebp + 16]  ;  set eax to LO(10), loop until HI(29)
+    CountsLoop:          ; build array by using counts array
+        mov ecx, [esi]    ; set ecx to value at counts for stosd         
+        rep stosd         ; store eax into &array (edi)        
+        add esi, TYPE DWORD ; move esi to next element of counts
         inc eax
-        cmp eax, [ebp + 28] ;compare eax to HI (29)              
+        cmp eax, edx ; compare eax to HI (29)              
         jle CountsLoop
                
     pop ebp
@@ -271,7 +260,7 @@ sortList    ENDP
 ; Calculate and display the median value, rounded to the nearest integer.
 ; receives: address of array and value of count on system stack
 ; returns: first count elements of array contain consecutive squares
-; preconditions: count is initialized, 1 <= count <= 100; registers changed: eax, ebx, ecx, edi
+; preconditions: array is sorted
 ; ***************************************************************
 displayMedian   PROC
     push ebp
@@ -314,9 +303,9 @@ countList       PROC
     mov esi, [ebp + 20] ; array offset
     mov edi, [ebp + 12] ; counts offset
 
-    ;set up for loop from 0 (ecx) to array size
+    ;set up for loop from 0 (ecx) to 200 (arraysize)
     xor ecx, ecx
-    L1:
+    L2:
         mov eax, [esi] ; convert eax to dword address using esi. looks something like: c[a[i]]++
         mov ebx, TYPE dword
         mul ebx     
@@ -324,10 +313,10 @@ countList       PROC
         mov eax, 1     ; increment number at that address 
         add [edi], eax
         mov edi, [ebp + 12] ; reset edi to beginning of counts
-        add esi, TYPE dword          ; move array foward
+        add esi, TYPE dword ; move array foward
         inc ecx             ; increment loop counter
-        cmp ecx, [ebp + 16]    
-    jl L1
+        cmp ecx, [ebp + 16] ; jump if ecx < arraysize
+        jl L2
     
     ; shift index 10-29 to the left of counts by using rep movsd
     cld                
@@ -363,7 +352,6 @@ intro ENDP
 displayInstructions PROC
     mov     edx, OFFSET instructions0
     call    WriteString
-
     ret
 displayInstructions ENDP
 
